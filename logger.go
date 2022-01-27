@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -46,6 +47,8 @@ type Factory interface {
 	WithFormatter(Formatter) Logger
 
 	// WithWriter returns a new Logger with writer set.
+	// It also reinitializes the write lock so it's better to call this only once
+	// per io.Writer.
 	WithWriter(io.Writer) Logger
 
 	// WithNamespace returns a new Logger with namespace set.
@@ -66,6 +69,7 @@ type logger struct {
 	level     Level
 	namespace string
 	writer    io.Writer
+	writerMu  *sync.Mutex
 }
 
 // New returns a new Logger with default StringFormatter. Be sure to call
@@ -78,6 +82,7 @@ func New() Logger {
 		level:     LevelUnknown,
 		namespace: "",
 		writer:    os.Stderr,
+		writerMu:  &sync.Mutex{},
 	}
 }
 
@@ -117,6 +122,7 @@ func (l *logger) setDefaults(old *logger) *logger {
 
 	if l.writer == nil {
 		l.writer = old.writer
+		l.writerMu = old.writerMu
 	}
 
 	return l
@@ -138,7 +144,10 @@ func (l *logger) WithFormatter(formatter Formatter) Logger {
 
 // WithWriter implements Logger.
 func (l *logger) WithWriter(writer io.Writer) Logger {
-	ret := &logger{writer: writer}
+	ret := &logger{
+		writer:   writer,
+		writerMu: &sync.Mutex{},
+	}
 
 	return ret.setDefaults(l)
 }
@@ -246,7 +255,12 @@ func (l *logger) log(ts time.Time, level Level, message string, ctx Ctx) (int, e
 		return 0, fmt.Errorf("log format error: %w", err)
 	}
 
+	l.writerMu.Lock()
+
 	i, err := l.writer.Write(formatted)
+
+	l.writerMu.Unlock()
+
 	if err != nil {
 		return i, fmt.Errorf("log write error: %w", err)
 	}
