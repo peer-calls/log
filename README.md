@@ -42,7 +42,7 @@ func main() {
 
 After running the script above you should see the output below:
 
-```go
+```console
 $ go run ./main.go
 2022-01-27T09:38:46.952896+01:00  warn [               test2] test a=1000 b=20
 2022-01-27T09:38:46.953052+01:00 error [               test2] test: err1 a=1000 b=20
