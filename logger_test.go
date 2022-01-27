@@ -1,4 +1,4 @@
-package logger_test
+package log_test
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/peer-calls/peer-calls/v4/server/logger"
+	"github.com/peer-calls/log"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,20 +33,20 @@ func (t *testWriter) String() string {
 }
 
 type testFormatter struct {
-	*logger.StringFormatter
+	*log.StringFormatter
 	mockErr error
 }
 
 func newTestFormatter() *testFormatter {
 	return &testFormatter{
-		StringFormatter: logger.NewStringFormatter(logger.StringFormatterParams{
+		StringFormatter: log.NewStringFormatter(log.StringFormatterParams{
 			DateLayout:               "-",
 			DisableContextKeySorting: false,
 		}),
 	}
 }
 
-func (f *testFormatter) Format(message logger.Message) ([]byte, error) {
+func (f *testFormatter) Format(message log.Message) ([]byte, error) {
 	if f.mockErr != nil {
 		return nil, f.mockErr
 	}
@@ -59,7 +59,7 @@ var errTest = fmt.Errorf("test err")
 func TestLogger_Namespace(t *testing.T) {
 	t.Parallel()
 
-	log := logger.New().WithNamespace("test").WithNamespaceAppended("test2")
+	log := log.New().WithNamespace("test").WithNamespaceAppended("test2")
 
 	assert.Equal(t, "test:test2", log.Namespace())
 }
@@ -69,15 +69,15 @@ func TestLogger(t *testing.T) {
 
 	type testEntry struct {
 		namespace string
-		level     logger.Level
+		level     log.Level
 		message   string
 		err       error
-		ctx       logger.Ctx
+		ctx       log.Ctx
 	}
 
 	type testCase struct {
 		config           string
-		ctx              logger.Ctx
+		ctx              log.Ctx
 		entries          []testEntry
 		mockWriterErr    error
 		mockFormatterErr error
@@ -89,40 +89,40 @@ func TestLogger(t *testing.T) {
 		{
 			config: "",
 			entries: []testEntry{
-				{"a", logger.LevelInfo, "test", nil, nil},
+				{"a", log.LevelInfo, "test", nil, nil},
 			},
 			wantResult: "",
 		},
 		{
 			config: "a:b",
 			entries: []testEntry{
-				{"a:b", logger.LevelInfo, "test", nil, nil},
+				{"a:b", log.LevelInfo, "test", nil, nil},
 			},
 			wantResult: "-  info [                 a:b] test\n",
 		},
 		{
 			config: "a",
 			entries: []testEntry{
-				{"a", logger.LevelDebug, "test", nil, nil},
+				{"a", log.LevelDebug, "test", nil, nil},
 			},
 		},
 		{
 			config: "a",
 			entries: []testEntry{
-				{"b", logger.LevelInfo, "test", nil, nil},
+				{"b", log.LevelInfo, "test", nil, nil},
 			},
 		},
 		{
 			config: "a:b:debug",
 			entries: []testEntry{
-				{"a:b", logger.LevelDebug, "test", nil, nil},
+				{"a:b", log.LevelDebug, "test", nil, nil},
 			},
 			wantResult: "- debug [                 a:b] test\n",
 		},
 		{
 			config: "a:b:debug",
 			entries: []testEntry{
-				{"a:b", logger.LevelDebug, "test", nil, nil},
+				{"a:b", log.LevelDebug, "test", nil, nil},
 			},
 			mockWriterErr: errTest,
 			wantErr:       fmt.Errorf("log write error: %w", errTest),
@@ -130,62 +130,62 @@ func TestLogger(t *testing.T) {
 		{
 			config: "a:b:debug",
 			entries: []testEntry{
-				{"a:b", logger.LevelDebug, "test", nil, nil},
+				{"a:b", log.LevelDebug, "test", nil, nil},
 			},
 			mockFormatterErr: errTest,
 			wantErr:          fmt.Errorf("log format error: %w", errTest),
 		},
 		{
 			config: "a:b:debug",
-			ctx: logger.Ctx{
+			ctx: log.Ctx{
 				"k1": "v1",
 				"k2": "v2",
 			},
 			entries: []testEntry{
-				{"a:b", logger.LevelDebug, "test", nil, logger.Ctx{"k2": "v3"}},
+				{"a:b", log.LevelDebug, "test", nil, log.Ctx{"k2": "v3"}},
 			},
 			wantResult: "- debug [                 a:b] test k1=v1 k2=v3\n",
 		},
 		{
 			config: "*:b:trace",
 			entries: []testEntry{
-				{"a:b", logger.LevelTrace, "test1", nil, nil},
-				{"a:c", logger.LevelTrace, "test2", nil, nil},
+				{"a:b", log.LevelTrace, "test1", nil, nil},
+				{"a:c", log.LevelTrace, "test2", nil, nil},
 			},
 			wantResult: "- trace [                 a:b] test1\n",
 		},
 		{
 			config: ":debug",
 			entries: []testEntry{
-				{"a:b", logger.LevelDebug, "test1", nil, nil},
-				{"a:c", logger.LevelTrace, "test2", nil, nil},
+				{"a:b", log.LevelDebug, "test1", nil, nil},
+				{"a:c", log.LevelTrace, "test2", nil, nil},
 			},
 			wantResult: "- debug [                 a:b] test1\n",
 		},
 		{
 			config: "a:b:trace,c:d",
-			ctx: logger.Ctx{
+			ctx: log.Ctx{
 				"k1": "v1",
 				"k2": "v2",
 			},
 			entries: []testEntry{
-				{"a:b", logger.LevelTrace, "test1", nil, logger.Ctx{"k2": "v3"}},
-				{"a:b", logger.LevelDebug, "test2", nil, logger.Ctx{"k3": "v3"}},
-				{"a:b", logger.LevelInfo, "test3", nil, logger.Ctx{"k4": "v4"}},
-				{"a:b", logger.LevelWarn, "test4", nil, logger.Ctx{"k5": "v5"}},
-				{"a:b", logger.LevelError, "", errTest, logger.Ctx{"k6": "v6"}},
-				{"a:b", logger.LevelError, "err msg", errTest, logger.Ctx{"k7": "v7"}},
-				{"a:b", logger.LevelError, "err msg", nil, logger.Ctx{"k8": "v8"}},
-				{"c:d", logger.LevelTrace, "test1", nil, logger.Ctx{"k2": "v3"}},
-				{"c:d", logger.LevelDebug, "test2", nil, logger.Ctx{"k3": "v3"}},
-				{"c:d", logger.LevelInfo, "test3", nil, logger.Ctx{"k4": "v4"}},
-				{"c:d", logger.LevelWarn, "test4", nil, logger.Ctx{"k5": "v5"}},
-				{"c:d", logger.LevelError, "", errTest, logger.Ctx{"k6": "v6"}},
-				{"e:f", logger.LevelTrace, "test1", nil, logger.Ctx{"k2": "v3"}},
-				{"e:f", logger.LevelDebug, "test2", nil, logger.Ctx{"k3": "v3"}},
-				{"e:f", logger.LevelInfo, "test3", nil, logger.Ctx{"k4": "v4"}},
-				{"e:f", logger.LevelWarn, "test4", nil, logger.Ctx{"k5": "v5"}},
-				{"e:f", logger.LevelError, "", errTest, logger.Ctx{"k6": "v6"}},
+				{"a:b", log.LevelTrace, "test1", nil, log.Ctx{"k2": "v3"}},
+				{"a:b", log.LevelDebug, "test2", nil, log.Ctx{"k3": "v3"}},
+				{"a:b", log.LevelInfo, "test3", nil, log.Ctx{"k4": "v4"}},
+				{"a:b", log.LevelWarn, "test4", nil, log.Ctx{"k5": "v5"}},
+				{"a:b", log.LevelError, "", errTest, log.Ctx{"k6": "v6"}},
+				{"a:b", log.LevelError, "err msg", errTest, log.Ctx{"k7": "v7"}},
+				{"a:b", log.LevelError, "err msg", nil, log.Ctx{"k8": "v8"}},
+				{"c:d", log.LevelTrace, "test1", nil, log.Ctx{"k2": "v3"}},
+				{"c:d", log.LevelDebug, "test2", nil, log.Ctx{"k3": "v3"}},
+				{"c:d", log.LevelInfo, "test3", nil, log.Ctx{"k4": "v4"}},
+				{"c:d", log.LevelWarn, "test4", nil, log.Ctx{"k5": "v5"}},
+				{"c:d", log.LevelError, "", errTest, log.Ctx{"k6": "v6"}},
+				{"e:f", log.LevelTrace, "test1", nil, log.Ctx{"k2": "v3"}},
+				{"e:f", log.LevelDebug, "test2", nil, log.Ctx{"k3": "v3"}},
+				{"e:f", log.LevelInfo, "test3", nil, log.Ctx{"k4": "v4"}},
+				{"e:f", log.LevelWarn, "test4", nil, log.Ctx{"k5": "v5"}},
+				{"e:f", log.LevelError, "", errTest, log.Ctx{"k6": "v6"}},
 			},
 			wantResult: `- trace [                 a:b] test1 k1=v1 k2=v3
 - debug [                 a:b] test2 k1=v1 k2=v2 k3=v3
@@ -208,7 +208,7 @@ func TestLogger(t *testing.T) {
 
 		formatter := newTestFormatter()
 
-		root := logger.New().WithConfig(logger.NewConfigFromString(tc.config)).
+		root := log.New().WithConfig(log.NewConfigFromString(tc.config)).
 			WithWriter(w).
 			WithCtx(tc.ctx).
 			WithFormatter(formatter)
@@ -220,19 +220,19 @@ func TestLogger(t *testing.T) {
 
 		for _, entry := range tc.entries {
 			switch entry.level {
-			case logger.LevelError:
+			case log.LevelError:
 				_, gotErr = root.WithNamespace(entry.namespace).Error(entry.message, entry.err, entry.ctx)
-			case logger.LevelWarn:
+			case log.LevelWarn:
 				_, gotErr = root.WithNamespace(entry.namespace).Warn(entry.message, entry.ctx)
-			case logger.LevelInfo:
+			case log.LevelInfo:
 				_, gotErr = root.WithNamespace(entry.namespace).Info(entry.message, entry.ctx)
-			case logger.LevelDebug:
+			case log.LevelDebug:
 				_, gotErr = root.WithNamespace(entry.namespace).Debug(entry.message, entry.ctx)
-			case logger.LevelTrace:
+			case log.LevelTrace:
 				_, gotErr = root.WithNamespace(entry.namespace).Trace(entry.message, entry.ctx)
-			case logger.LevelDisabled:
+			case log.LevelDisabled:
 				fallthrough
-			case logger.LevelUnknown:
+			case log.LevelUnknown:
 				fallthrough
 			default:
 				panic(fmt.Sprintf("unexpected level: %s", entry.level))
@@ -252,16 +252,16 @@ func TestLogger_WithNamespaceAppended(t *testing.T) {
 
 	w := newTestWriter()
 
-	log := logger.New().WithConfig(logger.LevelInfo).
+	logger := log.New().WithConfig(log.LevelInfo).
 		WithNamespaceAppended("a").
 		WithNamespaceAppended("b").
 		WithWriter(w).
 		WithFormatter(newTestFormatter())
 
-	_, err := log.Info("test1", nil)
+	_, err := logger.Info("test1", nil)
 	assert.NoError(t, err)
 
-	_, err = log.Trace("test2", nil)
+	_, err = logger.Trace("test2", nil)
 	assert.NoError(t, err)
 
 	gotStr := w.String()
@@ -272,10 +272,10 @@ func TestLogger_WithNamespaceAppended(t *testing.T) {
 func TestLogger_Ctx(t *testing.T) {
 	t.Parallel()
 
-	log := logger.New()
+	logger := log.New()
 
-	assert.Equal(t, logger.Ctx(nil), log.Ctx())
-	assert.Equal(t, logger.Ctx{"a": "b"}, log.WithCtx(logger.Ctx{"a": "b"}).Ctx())
+	assert.Equal(t, log.Ctx(nil), logger.Ctx())
+	assert.Equal(t, log.Ctx{"a": "b"}, logger.WithCtx(log.Ctx{"a": "b"}).Ctx())
 }
 
 func TestNewFromEnv(t *testing.T) {
@@ -289,23 +289,23 @@ func TestNewFromEnv(t *testing.T) {
 
 	os.Setenv(envKey, "**:a:trace,:info")
 
-	log := logger.NewFromEnv(envKey)
+	logger := log.NewFromEnv(envKey)
 
-	assert.Equal(t, true, log.IsLevelEnabled(logger.LevelInfo))
-	assert.Equal(t, false, log.IsLevelEnabled(logger.LevelDebug))
+	assert.Equal(t, true, logger.IsLevelEnabled(log.LevelInfo))
+	assert.Equal(t, false, logger.IsLevelEnabled(log.LevelDebug))
 
-	assert.Equal(t, true, log.WithNamespace("a").IsLevelEnabled(logger.LevelInfo))
-	assert.Equal(t, true, log.WithNamespace("a").IsLevelEnabled(logger.LevelDebug))
+	assert.Equal(t, true, logger.WithNamespace("a").IsLevelEnabled(log.LevelInfo))
+	assert.Equal(t, true, logger.WithNamespace("a").IsLevelEnabled(log.LevelDebug))
 
-	assert.Equal(t, true, log.WithNamespace("c:b:a").IsLevelEnabled(logger.LevelInfo))
-	assert.Equal(t, true, log.WithNamespace("c:b:a").IsLevelEnabled(logger.LevelDebug))
+	assert.Equal(t, true, logger.WithNamespace("c:b:a").IsLevelEnabled(log.LevelInfo))
+	assert.Equal(t, true, logger.WithNamespace("c:b:a").IsLevelEnabled(log.LevelDebug))
 
-	assert.Equal(t, true, log.WithNamespace("b").IsLevelEnabled(logger.LevelInfo))
-	assert.Equal(t, false, log.WithNamespace("b").IsLevelEnabled(logger.LevelDebug))
+	assert.Equal(t, true, logger.WithNamespace("b").IsLevelEnabled(log.LevelInfo))
+	assert.Equal(t, false, logger.WithNamespace("b").IsLevelEnabled(log.LevelDebug))
 }
 
 func BenchmarkLogger_Disabled(b *testing.B) {
-	log := logger.New().WithNamespace("test").WithConfig(logger.LevelDisabled)
+	logger := log.New().WithNamespace("test").WithConfig(log.LevelDisabled)
 
 	var thread int64
 
@@ -316,13 +316,13 @@ func BenchmarkLogger_Disabled(b *testing.B) {
 
 		for pb.Next() {
 			curN := atomic.AddInt64(&n, 1)
-			_, _ = log.Info("benchmark", logger.Ctx{"thread": curThread, "n": curN})
+			_, _ = logger.Info("benchmark", log.Ctx{"thread": curThread, "n": curN})
 		}
 	})
 }
 
 func BenchmarkLogger_Enabled(b *testing.B) {
-	log := logger.New().WithNamespace("test").WithConfig(logger.LevelInfo)
+	logger := log.New().WithNamespace("test").WithConfig(log.LevelInfo)
 
 	var thread int64
 
@@ -333,14 +333,14 @@ func BenchmarkLogger_Enabled(b *testing.B) {
 
 		for pb.Next() {
 			curN := atomic.AddInt64(&n, 1)
-			_, _ = log.Info("benchmark", logger.Ctx{"thread": curThread, "n": curN})
+			_, _ = logger.Info("benchmark", log.Ctx{"thread": curThread, "n": curN})
 		}
 	})
 }
 
 func BenchmarkLogger_EnabledWithoutSorting(b *testing.B) {
-	log := logger.New().WithNamespace("test").WithConfig(logger.LevelInfo).
-		WithFormatter(logger.NewStringFormatter(logger.StringFormatterParams{
+	logger := log.New().WithNamespace("test").WithConfig(log.LevelInfo).
+		WithFormatter(log.NewStringFormatter(log.StringFormatterParams{
 			DateLayout:               "",
 			DisableContextKeySorting: true,
 		}))
@@ -354,7 +354,7 @@ func BenchmarkLogger_EnabledWithoutSorting(b *testing.B) {
 
 		for pb.Next() {
 			curN := atomic.AddInt64(&n, 1)
-			_, _ = log.Info("benchmark", logger.Ctx{"thread": curThread, "n": curN})
+			_, _ = logger.Info("benchmark", log.Ctx{"thread": curThread, "n": curN})
 		}
 	})
 }

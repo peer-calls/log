@@ -1,37 +1,37 @@
-package logger_test
+package log_test
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/peer-calls/peer-calls/v4/server/logger"
+	"github.com/peer-calls/log"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestWildcardNode(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, logger.Config(nil), logger.NewConfig(nil))
+	assert.Equal(t, log.Config(nil), log.NewConfig(nil))
 
-	configMap := logger.ConfigMap{
-		"a":                logger.Level(1),
-		"a:b":              logger.Level(2),
-		"a:b:*":            logger.Level(3),
-		"a:*:c":            logger.Level(4),
-		"*:d":              logger.Level(5),
-		"a:b:c:d:e:f":      logger.Level(6),
-		"":                 logger.Level(7),
-		"aa:**:cc":         logger.Level(8),
-		"**:double:left":   logger.Level(9),
-		"double:right:**":  logger.Level(10),
-		"**:both:sides:**": logger.Level(11),
+	configMap := log.ConfigMap{
+		"a":                log.Level(1),
+		"a:b":              log.Level(2),
+		"a:b:*":            log.Level(3),
+		"a:*:c":            log.Level(4),
+		"*:d":              log.Level(5),
+		"a:b:c:d:e:f":      log.Level(6),
+		"":                 log.Level(7),
+		"aa:**:cc":         log.Level(8),
+		"**:double:left":   log.Level(9),
+		"double:right:**":  log.Level(10),
+		"**:both:sides:**": log.Level(11),
 	}
 
-	config := logger.NewConfig(configMap)
+	config := log.NewConfig(configMap)
 
 	type testCase struct {
 		namespace string
-		wantLevel logger.Level
+		wantLevel log.Level
 	}
 
 	testCases := []testCase{
